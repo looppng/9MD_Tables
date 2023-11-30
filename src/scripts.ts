@@ -39,8 +39,9 @@ class CountryManager {
     this.setupButtons();
   }
 
-  private getData(page: number) {
-    axios.get('http://localhost:3004/countries?_page=' + page + '&_limit=' + this.pageSize).then((response) => {
+  private getData(page: number, data: string = null) {
+
+    axios.get('http://localhost:3004/countries?_page=' + page + '&_limit=' + this.pageSize + data).then((response) => {
       this.countries = response.data;
       const limitedCountries = this.countries;
       this.populateTable(limitedCountries);
@@ -68,7 +69,7 @@ class CountryManager {
     if (countries && countries.length > 0) {
       countries.forEach((country) => {
         const row = tableBody.insertRow();
-        
+
         const nameCell = row.insertCell(0);
         const codeCell = row.insertCell(1);
         const capitalCell = row.insertCell(2);
@@ -78,16 +79,19 @@ class CountryManager {
         const flagCell = row.insertCell(6);
         const dialling_codeCell = row.insertCell(7);
         const isoCodeCell = row.insertCell(8);
-  
+
         nameCell.textContent = country.name;
         codeCell.textContent = country.code;
         capitalCell.textContent = country.capital;
         regionCell.textContent = country.region;
-  
+
         currencyCell.textContent = `${country.currency.code} (${country.currency.symbol}) - ${country.currency.name}`;
         languageCell.textContent = `${country.language.code} ${country.language.name}`;
-  
-        flagCell.textContent = country.flag;
+
+        axios.get(country.flag)
+            .then((response) => { flagCell.innerHTML = '<img src="' + country.flag + '" loading="lazy">'; })
+            .catch((error) => { flagCell.innerHTML = '<img src="https://www.worldatlas.com/r/w425/img/flag/' + country.code.toLowerCase() + '-flag.jpg" style="width: 40px;" loading="lazy">'; })
+
         dialling_codeCell.textContent = country.dialling_code.toString();
         isoCodeCell.textContent = country.isoCode.toString();
       });
@@ -152,35 +156,20 @@ class CountryManager {
   private fetchData(searchCriteria: SearchCriteria, sortBy: keyof Country = 'name') {
     let filteredCountries = this.countries;
 
-    if (Object.values(searchCriteria).every((value) => value === '')) {
-      filteredCountries = this.countries;
-    } else {
-      filteredCountries = this.countries.filter((country) => {
-        return (
-          country.name.toLowerCase().startsWith(searchCriteria.name.toLowerCase()) &&
-          country.capital.toLowerCase().startsWith(searchCriteria.capital.toLowerCase()) &&
-          typeof country.currency.name === 'string' &&
-          country.currency.name.toLowerCase().startsWith(searchCriteria.currency.toLowerCase()) &&
-          typeof country.language.name === 'string' &&
-          country.language.name.toLowerCase().startsWith(searchCriteria.language.toLowerCase())
-        );
-      });
-    }
-    filteredCountries.sort((a, b) => {
-      const aValue = String(a[sortBy]).toLowerCase();
-      const bValue = String(b[sortBy]).toLowerCase();
+    let url: string = '';
 
-      if (aValue < bValue) {
-        return -1;
-      } else if (aValue > bValue) {
-        return 1;
-      } else {
-        return 0;
+    Object.entries(searchCriteria).forEach(entry => {
+      let [key, value] = entry;
+      if (value.length > 0) {
+        if (key === 'currency' || key === 'language') {
+          url += '&' + key + '.name_like=' + value;
+        } else if (key === 'name' || key === 'capital') {
+          url += '&' + key + '_like=' + value;
+        }
       }
     });
-    const limitedCountries = filteredCountries.slice(0, 20);
 
-    this.populateTable(limitedCountries);
+    this.getData(this.currentIndex, url);
   }
 
   public searchButton() {
